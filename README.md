@@ -18,42 +18,17 @@ This MCP server connects Cursor to your Elasticsearch cluster with 4 powerful to
 
 ## Quick Start
 
-### Option 1: Use Pre-built Image (Recommended)
+### Build from Source
 ```bash
-docker pull ghcr.io/m0-ar/elasticsearch-mcp-server:latest
-```
-
-### Option 2: Build from Source
-```bash
-git clone https://github.com/m0-ar/elasticsearch-mcp-server.git
-cd elasticsearch-mcp-server
+git clone https://github.com/M0-AR/Custom-Elasticsearch-MCP-Server.git
+cd Custom-Elasticsearch-MCP-Server
 docker build -t elasticsearch-mcp:latest .
 ```
 
 ### 2. Add to Cursor MCP Configuration
 Add this to your `.cursor/mcp.json` file:
 
-**Using pre-built image:**
-```json
-{
-    "mcpServers": {
-        "elasticsearch-custom": {
-            "command": "docker",
-            "args": [
-                "run",
-                "-i",
-                "--rm",
-                "--add-host=host.docker.internal:host-gateway",
-                "-e",
-                "ES_URL=http://host.docker.internal:9400",
-                "ghcr.io/m0-ar/elasticsearch-mcp-server:latest"
-            ]
-        }
-    }
-}
-```
-
-**Using local build:**
+**Configuration:**
 ```json
 {
     "mcpServers": {
