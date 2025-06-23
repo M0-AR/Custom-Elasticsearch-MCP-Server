@@ -124,6 +124,91 @@ echo '{"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": {"name": "ge
 ES_URL="http://your-es-host:9200" python3 simple_elasticsearch_mcp.py
 ```
 
+## Troubleshooting
+
+### **❌ "Connection refused" or "timed out" errors**
+
+**Root Cause:** The most common issue is Docker container networking when Elasticsearch is accessible via SSH tunnel.
+
+**Solution:** Ensure these requirements are met:
+
+#### **1. SSH Tunnel Must Be Active**
+If your Elasticsearch is behind SSH tunnel (common for cloud deployments):
+```bash
+# Start SSH tunnel to forward port 9400
+ssh -L 9400:localhost:9400 -N -f -l username your-server-ip
+
+# Verify tunnel is working
+curl -X GET "localhost:9400/_cluster/health?pretty"
+```
+
+#### **2. Correct Docker Configuration**
+Your `mcp.json` should use **exactly** this configuration:
+```json
+"elasticsearch-custom": {
+    "command": "docker",
+    "args": [
+        "run",
+        "-i",
+        "--rm",
+        "--add-host=host.docker.internal:host-gateway",
+        "-e",
+        "ES_URL=http://host.docker.internal:9400",
+        "elasticsearch-mcp:latest"
+    ]
+}
+```
+
+**Key Points:**
+- ✅ Use `--add-host=host.docker.internal:host-gateway` (not IP addresses)
+- ✅ Use `ES_URL=http://host.docker.internal:9400` (not localhost)
+- ✅ SSH tunnel must be running before starting Cursor
+
+#### **3. Test Docker Connectivity**
+```bash
+# Test if Docker can reach your Elasticsearch
+docker run --rm --add-host=host.docker.internal:host-gateway alpine/curl \
+  curl -s http://host.docker.internal:9400/_cluster/health
+```
+
+#### **4. Complete MCP Docker Test**
+Test the full MCP workflow with this comprehensive command:
+```bash
+# Full MCP server test with proper initialization
+{
+    echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "test-client", "version": "1.0.0"}}}';
+    echo '{"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}}';
+    echo '{"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "list_indices", "arguments": {}}}';
+} | docker run -i --rm --add-host=host.docker.internal:host-gateway -e ES_URL="http://host.docker.internal:9400" elasticsearch-mcp:latest
+```
+
+**Expected Output:**
+- Initialization response with server info
+- List of all Elasticsearch indices in JSON format
+- No error messages
+
+#### **5. Alternative: Network Host Mode**
+If `host-gateway` doesn't work, try network host mode:
+```json
+"args": [
+    "run", "-i", "--rm", "--network=host",
+    "-e", "ES_URL=http://localhost:9400",
+    "elasticsearch-mcp:latest"
+]
+```
+
+### **❌ "Received request before initialization was complete"**
+
+**Root Cause:** MCP protocol requires proper initialization sequence.
+
+**Solution:** Always initialize before calling tools:
+```bash
+# Correct sequence:
+echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "test", "version": "1.0"}}}'
+echo '{"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}}'
+echo '{"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "list_indices", "arguments": {}}}'
+```
+
 ## That's It! 
 
 Build → Add to config → Restart Cursor → Done! 🚀 
